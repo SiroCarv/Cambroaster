@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema RR&amp;J – MVP</title>
+<style>
+:root{
+  --ink:#1d1611; --muted:#6f665c; --bg:#eeede8; --card:#ffffff; --line:#dedbd2;
+  --fry:#ffc21a; --fry-ink:#2b1d00; --chili:#c3281c; --ok:#1c7a43; --warn:#a8570a;
+  --paper:#fffef8; --paper-ink:#241b14; --focus:#0b57d0;
+  --sel-bg:#1d1611; --sel-fg:#ffffff; --soft:#f6f5f1;
+  --shadow:0 1px 0 rgba(0,0,0,.04),0 8px 20px -12px rgba(40,25,10,.4);
+  --font:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","SF Mono",Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ink:#f4efe6; --muted:#a39a8d; --bg:#14100d; --card:#201a15; --line:#382e25;
+    --chili:#ff6b5a; --ok:#4ac17f; --warn:#f0a03c; --focus:#8ab4ff;
+    --sel-bg:#ffc21a; --sel-fg:#2b1d00; --soft:#292119;
+    --shadow:0 1px 0 rgba(255,255,255,.03),0 8px 20px -12px rgba(0,0,0,.8);
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:16px;line-height:1.4;-webkit-text-size-adjust:100%}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.45}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+[hidden]{display:none!important}
+h1,h2,h3{margin:0;line-height:1.2}
+h2{font-size:1.05rem;font-weight:750;margin-bottom:10px}
+h3{font-size:.98rem;font-weight:700}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- Acceso ---------- */
+.login{min-height:100vh;display:grid;place-items:center;padding:20px;background:#1d1611;
+  background-image:radial-gradient(circle at 20% 10%,rgba(255,194,26,.18),transparent 45%),radial-gradient(circle at 85% 90%,rgba(195,40,28,.25),transparent 40%)}
+.login-card{width:100%;max-width:400px;background:var(--paper);color:var(--paper-ink);border-radius:18px;padding:28px 24px 24px;box-shadow:0 30px 60px -20px rgba(0,0,0,.6)}
+.login-card h1{font-size:2rem;font-weight:850;letter-spacing:-.02em}
+.login-card h1 span{background:var(--fry);color:var(--fry-ink);padding:0 .25em;border-radius:8px;margin-left:.1em}
+.login-card p{margin:.5rem 0 1.4rem;color:#6a5f53}
+.field{display:block;margin-bottom:14px}
+.field>span{display:block;font-size:.88rem;font-weight:650;margin-bottom:5px}
+.field input,.field select{width:100%;min-height:50px;border:2px solid #d8d2c5;border-radius:12px;background:#fff;color:#241b14;padding:0 14px}
+.btn{min-height:52px;border:0;border-radius:12px;padding:0 20px;font-weight:750;background:var(--sel-bg);color:var(--sel-fg)}
+.btn.primary{background:var(--fry);color:var(--fry-ink)}
+.btn.danger{background:var(--chili);color:#fff}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.btn.block{width:100%}
+.btn.sm{min-height:42px;padding:0 14px;font-size:.92rem}
+.err{color:#b3261e;font-weight:650;min-height:1.4em;margin:0 0 10px}
+.hint{font-size:.88rem;color:#6a5f53;margin-top:14px;text-align:center}
+.hint code{background:#efe9db;padding:2px 6px;border-radius:6px;font-family:var(--mono)}
+
+/* ---------- Estructura ---------- */
+.app{min-height:100vh;display:grid;grid-template-columns:1fr;grid-template-rows:auto 1fr}
+.top{background:#1d1611;color:#fff;display:flex;align-items:center;gap:12px;padding:10px 16px;position:sticky;top:0;z-index:30}
+.brand{font-weight:850;font-size:1.15rem;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.brand b{background:var(--fry);color:var(--fry-ink);padding:1px 8px;border-radius:7px}
+.top .grow{flex:1}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:3px 11px;font-size:.82rem;font-weight:650;background:rgba(255,255,255,.12);color:#fff;white-space:nowrap}
+.chip.alert{background:var(--chili)}
+.roles{display:none;gap:6px}
+.top .btn{min-height:38px;padding:0 12px;font-size:.88rem;background:rgba(255,255,255,.12);color:#fff}
+.clock{font-variant-numeric:tabular-nums;font-weight:650;opacity:.9;display:none}
+
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#1d1611;display:grid;grid-template-columns:repeat(6,1fr);padding:6px 4px calc(6px + env(safe-area-inset-bottom));gap:2px}
+.nav button{background:none;border:0;color:#cfc6b8;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:10px;font-size:.72rem;font-weight:650;position:relative;min-height:52px}
+.nav button svg{width:24px;height:24px}
+.nav button.on{background:var(--fry);color:var(--fry-ink)}
+.nav .badge{position:absolute;top:2px;right:calc(50% - 22px);background:var(--chili);color:#fff;border-radius:99px;min-width:19px;height:19px;font-size:.7rem;display:grid;place-items:center;padding:0 5px}
+main{padding:16px 14px 150px;max-width:1180px;width:100%;margin:0 auto}
+.block{background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:var(--shadow)}
+.view-title{font-size:1.4rem;font-weight:800;letter-spacing:-.01em;margin:2px 0 14px}
+.view-title small{font-size:.9rem;font-weight:500;color:var(--muted);margin-left:8px}
+
+@media (min-width:900px){
+  .app{grid-template-columns:104px 1fr;grid-template-rows:auto 1fr}
+  .top{grid-column:1 / -1}
+  .nav{position:sticky;top:58px;align-self:start;grid-column:1;grid-row:2;height:calc(100vh - 58px);display:flex;flex-direction:column;justify-content:flex-start;gap:6px;padding:14px 8px;background:#2a2019}
+  .nav button{font-size:.8rem;min-height:68px}
+  main{grid-column:2;grid-row:2;padding-bottom:40px}
+  .roles{display:flex}
+  .clock{display:block}
+}
+
+/* ---------- Controles ---------- */
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg button{flex:1 1 0;min-width:96px;min-height:52px;border-radius:12px;border:2px solid var(--line);background:var(--card);font-weight:700;padding:0 10px}
+.seg button.on{background:var(--sel-bg);border-color:var(--sel-bg);color:var(--sel-fg)}
+.seg button small{display:block;font-weight:500;opacity:.8;font-size:.8rem}
+.seg.tight button{min-width:0}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (min-width:560px){.tiles{grid-template-columns:repeat(4,1fr)}.tiles.three{grid-template-columns:repeat(3,1fr)}.tiles.two{grid-template-columns:repeat(2,1fr)}}
+.tile{position:relative;min-height:88px;border-radius:14px;border:2px solid var(--line);background:var(--card);padding:10px 12px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;touch-action:manipulation}
+.tile .nm{font-weight:750;font-size:1.05rem}
+.tile .pr{font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.tile.pollo{border-color:var(--fry);background:linear-gradient(180deg,rgba(255,194,26,.16),transparent 70%)}
+.tile:active:not(:disabled){transform:scale(.97)}
+.tile .qty{position:absolute;top:-10px;right:-6px;background:var(--chili);color:#fff;border-radius:99px;min-width:28px;height:28px;display:grid;place-items:center;font-weight:800;font-size:.9rem;padding:0 7px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.toggle{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;border-radius:12px;border:2px dashed var(--line);background:transparent;padding:0 14px;font-weight:700;margin-bottom:10px;text-align:left}
+.toggle .sw{width:42px;height:24px;border-radius:99px;background:var(--line);position:relative;flex:none;transition:background .15s}
+.toggle .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+.toggle.on{border-style:solid;border-color:var(--fry)}
+.toggle.on .sw{background:var(--ok)}
+.toggle.on .sw::after{transform:translateX(18px)}
+.toggle .r{margin-left:auto;color:var(--muted);font-weight:600;font-size:.9rem}
+.banner{border-radius:12px;padding:10px 14px;font-weight:650;margin-bottom:12px;background:rgba(195,40,28,.12);color:var(--chili);border:1px solid var(--chili)}
+.banner.ok{background:rgba(28,122,67,.12);color:var(--ok);border-color:var(--ok)}
+.banner.fry{background:rgba(255,194,26,.2);color:var(--ink);border-color:var(--fry)}
+
+/* ---------- Ticket (comanda) ---------- */
+.pedido{display:grid;gap:12px}
+@media (min-width:900px){.pedido{grid-template-columns:1fr 390px;align-items:start}.ticket-wrap{position:sticky;top:74px}}
+.ticket-wrap{padding-bottom:18px}
+.ticket{position:relative;background:var(--paper);color:var(--paper-ink);padding:18px 16px 16px;font-family:var(--mono);font-size:.92rem;box-shadow:var(--shadow);border-radius:4px 4px 0 0}
+.ticket::after{content:"";position:absolute;left:0;right:0;top:100%;height:9px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M0 0h14L7 9z' fill='%23fffef8'/%3E%3C/svg%3E") repeat-x 0 0/14px 9px;
+  filter:drop-shadow(0 4px 3px rgba(40,25,10,.15))}
+.ticket h2{font-family:var(--font);font-size:1.25rem;font-weight:850;margin:0}
+.ticket .sub{color:#74685a;font-size:.82rem}
+.ticket hr{border:0;border-top:2px dashed #cfc6b3;margin:12px 0}
+.ticket .ln{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:4px 0}
+.ticket .ln .t{display:flex;flex-direction:column;line-height:1.25}
+.ticket .ln .t small{color:#74685a}
+.ticket .tot{display:flex;justify-content:space-between;font-weight:800;font-size:1.3rem;font-family:var(--font)}
+.ticket .row{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
+.ticket .empty{color:#8a7d6c;text-align:center;padding:18px 0;font-family:var(--font)}
+.step{display:inline-flex;align-items:center;gap:2px;font-family:var(--font)}
+.step button{width:38px;height:38px;border-radius:10px;border:2px solid #d5ccb8;background:#fff;color:#241b14;font-weight:800;font-size:1.1rem;line-height:1}
+.step b{min-width:26px;text-align:center}
+.paybtns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.paybtns button,.pay2 button{min-height:50px;border-radius:12px;border:2px solid #d5ccb8;background:#fff;color:#241b14;font-weight:750;font-family:var(--font)}
+.pay2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.paybtns button.on,.pay2 button.on{background:#241b14;border-color:#241b14;color:#fff}
+.change{margin-top:10px;padding:10px 12px;border-radius:10px;background:#f0ead9;font-family:var(--font);display:flex;justify-content:space-between;font-weight:700}
+.why{font-family:var(--font);font-size:.86rem;color:#8c3b11;margin:8px 0 0;min-height:1.2em}
+.ticket .btn{font-family:var(--font)}
+.cartbar{position:fixed;left:10px;right:10px;bottom:76px;z-index:35;background:var(--fry);color:var(--fry-ink);border-radius:14px;padding:8px 8px 8px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:800;box-shadow:0 10px 24px -8px rgba(0,0,0,.5)}
+.cartbar .btn{min-height:44px;background:#1d1611;color:#fff}
+@media (min-width:900px){.cartbar{display:none!important}}
+
+/* ---------- Cocina ---------- */
+.kgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));align-items:start}
+.kt{position:relative;background:var(--paper);color:var(--paper-ink);border-radius:4px 4px 0 0;padding:0 14px 14px;font-family:var(--mono);font-size:.9rem;box-shadow:var(--shadow);margin-bottom:10px;border-top:10px solid var(--fry)}
+.kt.preparando{border-top-color:#ee7a14}
+.kt.listo{border-top-color:var(--ok)}
+.kt::after{content:"";position:absolute;left:0;right:0;top:100%;height:9px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M0 0h14L7 9z' fill='%23fffef8'/%3E%3C/svg%3E") repeat-x 0 0/14px 9px}
+.kt .hd{display:flex;justify-content:space-between;align-items:baseline;padding-top:10px;font-family:var(--font)}
+.kt .hd .no{font-size:1.5rem;font-weight:850}
+.kt .el{font-variant-numeric:tabular-nums;font-weight:800;font-size:1.1rem}
+.kt .el.late{color:#c3281c}
+.kt .tags{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px;font-family:var(--font)}
+.tag{border-radius:6px;padding:2px 8px;font-size:.8rem;font-weight:750;background:#241b14;color:#fff}
+.tag.y{background:var(--fry);color:#2b1d00}
+.tag.r{background:#c3281c;color:#fff}
+.kt ul{list-style:none;padding:0;margin:8px 0;border-top:2px dashed #cfc6b3;border-bottom:2px dashed #cfc6b3}
+.kt li{padding:5px 0;display:flex;gap:8px}
+.kt li b{min-width:28px}
+.kt .acts{display:flex;gap:8px;margin-top:10px;font-family:var(--font)}
+.kt .acts .btn{flex:1;min-height:48px}
+.kt .note{font-family:var(--font);font-size:.82rem;color:#74685a;margin-top:8px}
+.donelist{display:grid;gap:6px}
+.donelist div{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--soft);border-radius:10px;font-size:.92rem}
+
+/* ---------- Caja / Reportes / otros ---------- */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media (min-width:700px){.stats{grid-template-columns:repeat(3,1fr)}.stats.five{grid-template-columns:repeat(5,1fr)}}
+.stat{background:var(--soft);border-radius:12px;padding:12px}
+.stat .v{font-size:1.45rem;font-weight:800;font-variant-numeric:tabular-nums}
+.stat .l{font-size:.85rem;color:var(--muted)}
+.cols{display:grid;gap:12px}
+@media (min-width:900px){.cols.two{grid-template-columns:1fr 1fr;align-items:start}}
+.den{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:8px}
+.den .d{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--soft);border-radius:12px;padding:8px 10px}
+.den .d>b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.den .step button{background:var(--card);border-color:var(--line);color:var(--ink)}
+.result{border-radius:14px;padding:14px;margin-top:12px;font-weight:700}
+.result.ok{background:rgba(28,122,67,.14);border:2px solid var(--ok)}
+.result.bad{background:rgba(195,40,28,.12);border:2px solid var(--chili)}
+.result.wait{background:var(--soft);border:2px dashed var(--line);color:var(--muted)}
+.result .big{font-size:1.5rem;font-weight:850}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.kv:last-child{border-bottom:0}
+.kv span:last-child{font-weight:700;font-variant-numeric:tabular-nums}
+.inline{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.inline .field{margin:0;flex:1 1 140px}
+.inline .field input,.inline .field select,.num-in{width:100%;min-height:50px;border:2px solid var(--line);border-radius:12px;background:var(--card);padding:0 12px}
+table{width:100%;border-collapse:collapse;font-size:.93rem}
+th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line)}
+th{font-weight:700;color:var(--muted);font-size:.84rem}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:110px 1fr 44px;align-items:center;gap:10px}
+.bar .tr{height:22px;background:var(--soft);border-radius:6px;overflow:hidden}
+.bar .fl{height:100%;background:var(--fry);border-radius:6px}
+.bar .fl.peak{background:var(--chili)}
+.bar span:last-child{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.empty-state{padding:22px 10px;text-align:center;color:var(--muted)}
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.pills button{min-height:44px;border-radius:99px;border:2px solid var(--line);background:var(--card);padding:0 16px;font-weight:700}
+.pills button.on{background:var(--sel-bg);border-color:var(--sel-bg);color:var(--sel-fg)}
+details.h{border-bottom:1px solid var(--line)}
+details.h summary{list-style:none;display:grid;grid-template-columns:48px 1fr auto;gap:8px;align-items:center;padding:10px 4px;cursor:pointer;min-height:48px}
+details.h summary::-webkit-details-marker{display:none}
+details.h .dt{padding:0 4px 12px 56px;font-size:.9rem;color:var(--muted)}
+.st{font-size:.78rem;font-weight:750;border-radius:6px;padding:2px 8px;background:var(--soft)}
+.st.anulado{background:rgba(195,40,28,.14);color:var(--chili)}
+.st.entregado{background:rgba(28,122,67,.14);color:var(--ok)}
+.menu-row{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line)}
+.menu-row:last-child{border-bottom:0}
+.menu-row .num-in{text-align:right}
+
+#toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);background:#1d1611;color:#fff;padding:12px 18px;border-radius:12px;font-weight:650;z-index:90;max-width:90vw;box-shadow:0 12px 30px -8px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+dialog{border:0;border-radius:18px;padding:0;max-width:640px;width:calc(100% - 24px);background:var(--card);color:var(--ink);box-shadow:0 30px 70px -20px rgba(0,0,0,.7)}
+dialog::backdrop{background:rgba(20,12,6,.6)}
+.dlg{padding:20px 20px 18px;max-height:85vh;overflow:auto}
+.dlg h2{font-size:1.3rem}
+.dlg h3{margin:14px 0 4px}
+.dlg ul{margin:4px 0 0;padding-left:20px}
+.dlg li{margin:2px 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<section class="login" id="login">
+  <form class="login-card" id="loginForm" autocomplete="off">
+    <h1>Pollos<span>RR&amp;J</span></h1>
+    <p>Pedidos, cocina y caja en un solo lugar.</p>
+    <label class="field"><span>Usuario</span><input id="lgUser" name="user" autocapitalize="none" autocomplete="username" required></label>
+    <label class="field"><span>Contraseña</span><input id="lgPass" name="pass" type="password" autocomplete="current-password" required></label>
+    <p class="err" id="lgErr" role="alert"></p>
+    <button class="btn primary block" type="submit">Ingresar</button>
+    <p class="hint">Prototipo de demostración. Usuario <code>roxana</code> · contraseña <code>rrj2026</code></p>
+  </form>
+</section>
+
+<div class="app" id="app" hidden>
+  <header class="top">
+    <div class="brand"><b>RR&amp;J</b> Pollos</div>
+    <span class="chip alert" id="arrozChip" hidden>Arroz agotado · espera 30 min</span>
+    <div class="grow"></div>
+    <div class="roles" id="roles"></div>
+    <span class="clock" id="clock"></span>
+    <button class="btn" data-act="about" type="button">Acerca del MVP</button>
+    <button class="btn" data-act="logout" type="button">Salir</button>
+  </header>
+  <nav class="nav" id="nav" aria-label="Módulos"></nav>
+  <main id="view" tabindex="-1"></main>
+</div>
+
+<div class="cartbar" id="cartbar" hidden>
+  <span id="cartbarTxt"></span>
+  <button class="btn" data-act="goTicket" type="button">Cobrar</button>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="about">
+  <div class="dlg" id="aboutBody"></div>
+</dialog>
+
+<script>
+'use strict';
+/* =====================================================================
+   Sistema RR&J – MVP (prototipo local, sin base de datos)
+   Los datos viven en memoria y se guardan en el navegador (localStorage).
+   ===================================================================== */
+const KEY = 'rrj_mvp_v1';
+const SESSION_KEY = 'rrj_mvp_session';
+const USER = { user: 'roxana', pass: 'rrj2026', nombre: 'Roxana', roles: ['propietaria', 'cajera', 'cocina'] };
+const ETA_BASE = 15;   // minutos de espera estimada (supuesto de demo; el documento solo define los 30 min con arroz agotado)
+const ETA_ARROZ = 30;  // RF-03.3
+const DENOMS = [200, 100, 50, 20, 10, 5, 2, 1, 0.5];
+const BILLS = [10, 20, 50, 100, 200];
+const ACTIVE = ['pendiente', 'preparando', 'listo'];
+
+const $ = (s, r = document) => r.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = n => { n = Math.round(n * 100) / 100; return 'Bs ' + (Number.isInteger(n) ? n : n.toFixed(2)); };
+const pad = n => String(n).padStart(2, '0');
+const dayKey = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+const timeStr = ts => { const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+const dateStr = ts => { const d = new Date(ts); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1); };
+const startOfDay = ts => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const todayKey = () => dayKey(Date.now());
+
+const CANALES = { presencial: 'Presencial', telefonico: 'Teléfono', whatsapp: 'WhatsApp' };
+const ENTREGAS = { llevar: 'Para llevar', mesa: 'En mesa', delivery: 'Delivery' };
+const ESTADOS = { pendiente: 'Pendiente', preparando: 'En preparación', listo: 'Listo', entregado: 'Entregado', anulado: 'Anulado' };
+
+/* ---------- Menú inicial (precios del documento de requerimientos) ---------- */
+const defaultMenu = () => ({
+  items: [
+    { id: 'pierna', name: 'Pollo pierna', short: 'Pierna', cat: 'pollo', price: 18 },
+    { id: 'ala', name: 'Pollo ala', short: 'Ala', cat: 'pollo', price: 18 },
+    { id: 'contra', name: 'Pollo contra', short: 'Contra', cat: 'pollo', price: 18 },
+    { id: 'pecho', name: 'Pollo pecho', short: 'Pecho', cat: 'pollo', price: 20 },
+    { id: 'hamburguesa', name: 'Hamburguesa', short: 'Hamburguesa', cat: 'hamburguesa', price: 17 },
+    { id: 'salchipapa', name: 'Salchipapa', short: 'Salchipapa', cat: 'salchipapa', price: 16 }
+  ],
+  extras: [
+    { id: 'papa', name: 'Porción de papa', price: 7 },
+    { id: 'arroz', name: 'Porción de arroz', price: 4 },
+    { id: 'salsa', name: 'Salsa extra', price: 3 }
+  ],
+  puraPapa: 1,
+  delivery: [
+    { id: 'villasol', name: 'Villa Sol 1 y 2', fee: 6 },
+    { id: 'villaarturo', name: 'Villa Arturo', fee: 7 },
+    { id: 'viana', name: 'Viana', fee: 8 },
+    { id: 'jorori', name: 'Jorori', fee: 10 }
+  ],
+  lluvia: 1
+});
+
+/* ---------- Cálculo de precios (RF-02.1 a RF-02.3, RF-04.1, RF-04.2) ---------- */
+function calcOrder(c, menu) {
+  const it = id => menu.items.find(x => x.id === id);
+  const ex = id => menu.extras.find(x => x.id === id);
+  let sub = 0;
+  c.lines.forEach(l => { const p = it(l.pid); if (p) sub += l.qty * (p.price + (l.pp ? menu.puraPapa : 0)); });
+  c.extras.forEach(e => { const p = ex(e.id); if (p) sub += e.qty * p.price; });
+  let fee = 0, rain = 0;
+  if (c.entrega === 'delivery' && c.barrio) {
+    const b = menu.delivery.find(x => x.id === c.barrio);
+    fee = b ? b.fee : 0;
+    if (c.lluvia) rain = menu.lluvia;
+  }
+  return { sub, fee, rain, total: sub + fee + rain };
+}
+
+/* ---------- Datos de demostración ---------- */
+function rng(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function seedState() {
+  const menu = defaultMenu();
+  const r = rng(20261006);
+  const wpick = (arr, w) => { let t = w.reduce((a, b) => a + b, 0) * r(), i = 0; while (t > w[i]) { t -= w[i]; i++; } return arr[i]; };
+  const hours = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
+  const hw = [3, 6, 3, 1, 1, 2, 4, 7, 7, 3, 1];
+  const now = Date.now(), t0 = startOfDay(now);
+  let id = 1;
+  const orders = [], purchases = [];
+
+  function mkOrder(ts, estado) {
+    const lines = [], extras = [];
+    const n = 1 + Math.floor(r() * 3);
+    for (let i = 0; i < n; i++) {
+      const p = wpick(menu.items, [5, 3, 3, 3, 2, 3]);
+      const pp = p.cat === 'pollo' && r() < 0.15;
+      const ex = lines.find(l => l.pid === p.id && l.pp === pp);
+      if (ex) ex.qty++; else lines.push({ pid: p.id, name: p.name, pp, qty: 1 + (r() < 0.25 ? 1 : 0), unit: p.price });
+    }
+    if (r() < 0.3) { const e = menu.extras[Math.floor(r() * 3)]; extras.push({ id: e.id, name: e.name, qty: 1, unit: e.price }); }
+    const entrega = wpick(['llevar', 'mesa', 'delivery'], [.4, .25, .35]);
+    const barrio = entrega === 'delivery' ? menu.delivery[Math.floor(r() * 4)].id : null;
+    const lluvia = entrega === 'delivery' && r() < 0.1;
+    const c = { lines: lines.map(l => ({ pid: l.pid, pp: l.pp, qty: l.qty })), extras: extras.map(e => ({ id: e.id, qty: e.qty })), entrega, barrio, lluvia };
+    const t = calcOrder(c, menu);
+    const pago = r() < 0.6 ? 'efectivo' : 'qr';
+    let recibido = t.total;
+    if (pago === 'efectivo') recibido = BILLS.find(b => b >= t.total && (b - t.total) < 100) || Math.ceil(t.total / 10) * 10;
+    return {
+      id: id++, ts, canal: wpick(['presencial', 'whatsapp', 'telefonico'], [.45, .35, .2]), entrega, barrio, lluvia,
+      lines, extras, sub: t.sub, fee: t.fee, rain: t.rain, total: t.total, pago, recibido, cambio: pago === 'efectivo' ? recibido - t.total : 0,
+      estado, eta: ETA_BASE
+    };
+  }
+
+  for (let dd = 6; dd >= 0; dd--) {
+    const base = t0 - dd * 86400000;
+    const n = dd === 0 ? 12 : 10 + Math.floor(r() * 9);
+    const list = [];
+    for (let i = 0; i < n; i++) {
+      const h = wpick(hours, hw);
+      const ts = base + h * 3600000 + Math.floor(r() * 60) * 60000;
+      if (ts > now - 20 * 60000) continue;
+      list.push(ts);
+    }
+    list.sort((a, b) => a - b).forEach(ts => orders.push(mkOrder(ts, dd > 0 && r() < 0.03 ? 'anulado' : 'entregado')));
+    if (dd % 2 === 0) purchases.push({ id: purchases.length + 1, ts: base + 11 * 3600000, producto: 'Gaseosa 2 L', cant: 12, monto: 96 });
+  }
+  // Dos pedidos "vivos" para que la cocina no se vea vacía en la demo
+  orders.push(mkOrder(now - 9 * 60000, 'preparando'));
+  orders.push(mkOrder(now - 4 * 60000, 'pendiente'));
+  orders[orders.length - 2].startedAt = now - 6 * 60000;
+
+  const arqueos = {};
+  for (let dd = 6; dd >= 1; dd--) {
+    const k = dayKey(t0 - dd * 86400000);
+    const ok = orders.filter(o => dayKey(o.ts) === k && o.estado !== 'anulado');
+    const cash = ok.filter(o => o.pago === 'efectivo').reduce((a, o) => a + o.total, 0);
+    const qr = ok.filter(o => o.pago === 'qr').reduce((a, o) => a + o.total, 0);
+    const diff = [0, 0, -2, 0, 1, 0][dd - 1];
+    arqueos[k] = { inicial: 100, esperado: 100 + cash, contado: 100 + cash + diff, diff, cash, qr, ts: t0 - dd * 86400000 + 23 * 3600000 };
+  }
+
+  return {
+    v: 1, menu, orders, purchases, arqueos, nextId: id, nextPurchase: purchases.length + 1,
+    arrozAgotado: false, caja: { day: dayKey(now), inicial: 100, den: {} }
+  };
+}
+
+/* ---------- Estado y persistencia ---------- */
+let S;
+function load() {
+  try { const raw = localStorage.getItem(KEY); if (raw) { S = JSON.parse(raw); if (S && S.v === 1) return; } } catch (e) { /* sin almacenamiento: seguimos en memoria */ }
+  S = seedState(); save();
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* ignorar */ } }
+
+let toastT;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ---------- Consultas ---------- */
+const itemOf = id => S.menu.items.find(x => x.id === id);
+const isToday = ts => dayKey(ts) === todayKey();
+const validOrders = list => list.filter(o => o.estado !== 'anulado');
+const sumBy = (list, f) => list.reduce((a, o) => a + f(o), 0);
+function dayStats(key) {
+  const os = validOrders(S.orders.filter(o => dayKey(o.ts) === key));
+  const cash = sumBy(os.filter(o => o.pago === 'efectivo'), o => o.total);
+  const qr = sumBy(os.filter(o => o.pago === 'qr'), o => o.total);
+  const fees = sumBy(os, o => (o.fee || 0) + (o.rain || 0));
+  const buys = sumBy(S.purchases.filter(p => dayKey(p.ts) === key), p => p.monto);
+  return { n: os.length, total: cash + qr, cash, qr, fees, buys };
+}
+function orderSummary(o) {
+  const parts = o.lines.map(l => l.qty + '× ' + l.name.replace('Pollo ', '') + (l.pp ? ' (pura papa)' : ''));
+  o.extras.forEach(e => parts.push(e.qty + '× ' + e.name));
+  return parts.join(', ');
+}
+function entregaLabel(o) {
+  if (o.entrega !== 'delivery') return ENTREGAS[o.entrega];
+  const b = S.menu.delivery.find(x => x.id === o.barrio);
+  return 'Delivery · ' + (b ? b.name : '') + (o.lluvia ? ' · lluvia' : '');
+}
+
+/* =====================================================================
+   Navegación y estructura
+   ===================================================================== */
+const ICONS = {
+  pedido: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+  cocina: '<path d="M4 11h16v2a6 6 0 0 1-6 6h-4a6 6 0 0 1-6-6z"/><path d="M8 7c0-2 2-2 2-4M12 7c0-2 2-2 2-4M16 7c0-2 2-2 2-4" />',
+  caja: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v.01M18 15v.01"/>',
+  compras: '<path d="M5 8h14l-1 12H6z"/><path d="M9 8a3 3 0 0 1 6 0"/>',
+  reportes: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h10"/>'
+};
+const VIEWS = [
+  ['pedido', 'Pedido'], ['cocina', 'Cocina'], ['caja', 'Caja'],
+  ['compras', 'Compras'], ['reportes', 'Reportes'], ['menu', 'Menú']
+];
+let view = 'pedido';
+let cart = newCart();
+function newCart() { return { lines: [], extras: [], canal: 'presencial', entrega: 'llevar', barrio: null, lluvia: false, pago: null, recibido: null, pp: false }; }
+
+function drawChrome() {
+  const active = S.orders.filter(o => ACTIVE.includes(o.estado)).length;
+  $('#nav').innerHTML = VIEWS.map(([id, label]) =>
+    `<button type="button" data-act="nav" data-v="${id}" class="${view === id ? 'on' : ''}" ${view === id ? 'aria-current="page"' : ''}>
+       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[id]}</svg>
+       ${label}${id === 'cocina' && active ? `<span class="badge" aria-label="${active} pedidos en curso">${active}</span>` : ''}
+     </button>`).join('');
+  $('#roles').innerHTML = `<span class="chip">${esc(USER.nombre)}</span>` + USER.roles.map(r => `<span class="chip">${r}</span>`).join('');
+  const chip = $('#arrozChip'); chip.hidden = !S.arrozAgotado;
+  const showBar = view === 'pedido' && (cart.lines.length || cart.extras.length);
+  $('#cartbar').hidden = !showBar;
+  if (showBar) {
+    const t = calcOrder(cart, S.menu);
+    const n = cart.lines.reduce((a, l) => a + l.qty, 0) + cart.extras.reduce((a, e) => a + e.qty, 0);
+    $('#cartbarTxt').textContent = n + (n === 1 ? ' ítem · ' : ' ítems · ') + money(t.total);
+  }
+}
+
+const views = {};
+function render() {
+  drawChrome();
+  $('#view').innerHTML = views[view]();
+  tick();
+}
+
+/* =====================================================================
+   PEDIDO (RF-02, RF-04, RF-05.1)
+   ===================================================================== */
+function tile(p) {
+  const qty = cart.lines.filter(l => l.pid === p.id).reduce((a, l) => a + l.qty, 0);
+  const extra = p.cat === 'pollo' && cart.pp ? ` + ${money(S.menu.puraPapa)}` : '';
+  return `<button class="tile ${p.cat === 'pollo' ? 'pollo' : ''}" type="button" data-act="add" data-id="${p.id}">
+      ${qty ? `<span class="qty">${qty}</span>` : ''}
+      <span class="nm">${esc(p.short)}</span><span class="pr">${money(p.price)}${extra}</span></button>`;
+}
+function extraTile(e) {
+  const qty = (cart.extras.find(x => x.id === e.id) || {}).qty || 0;
+  const off = e.id === 'arroz' && S.arrozAgotado;
+  return `<button class="tile" type="button" data-act="addExtra" data-id="${e.id}" ${off ? 'disabled' : ''}>
+      ${qty ? `<span class="qty">${qty}</span>` : ''}
+      <span class="nm">${esc(e.name)}</span><span class="pr">${off ? 'Agotado' : money(e.price)}</span></button>`;
+}
+function validateCart() {
+  if (!cart.lines.length) return 'Agrega al menos un plato.';
+  if (cart.entrega === 'delivery' && !cart.barrio) return 'Elige el barrio de entrega.';
+  if (!cart.pago) return 'Elige cómo paga: efectivo o QR.';
+  const t = calcOrder(cart, S.menu);
+  if (cart.pago === 'efectivo' && cart.recibido !== 'exacto' && (cart.recibido == null || cart.recibido < t.total)) return 'Indica el billete que recibes.';
+  return '';
+}
+function ticketHTML() {
+  const m = S.menu, t = calcOrder(cart, m);
+  const empty = !cart.lines.length && !cart.extras.length;
+  const lines = cart.lines.map((l, i) => {
+    const p = itemOf(l.pid); const u = p.price + (l.pp ? m.puraPapa : 0);
+    return `<div class="ln"><div class="t"><span>${esc(p.name)}</span><small>${l.pp ? 'Pura papa · ' : ''}${money(u)} c/u</small></div>
+      <div class="step"><button type="button" data-act="lineDec" data-i="${i}" aria-label="Quitar uno">−</button><b>${l.qty}</b><button type="button" data-act="lineInc" data-i="${i}" aria-label="Agregar uno">+</button></div></div>`;
+  }).join('');
+  const extras = cart.extras.map((e, i) => {
+    const p = m.extras.find(x => x.id === e.id);
+    return `<div class="ln"><div class="t"><span>${esc(p.name)}</span><small>${money(p.price)} c/u</small></div>
+      <div class="step"><button type="button" data-act="exDec" data-i="${i}" aria-label="Quitar uno">−</button><b>${e.qty}</b><button type="button" data-act="exInc" data-i="${i}" aria-label="Agregar uno">+</button></div></div>`;
+  }).join('');
+  const b = cart.entrega === 'delivery' && cart.barrio ? m.delivery.find(x => x.id === cart.barrio) : null;
+  const why = validateCart();
+  let pay = '';
+  if (!empty) {
+    pay = `<hr><div class="pay2">
+        <button type="button" data-act="pago" data-v="efectivo" class="${cart.pago === 'efectivo' ? 'on' : ''}">Efectivo</button>
+        <button type="button" data-act="pago" data-v="qr" class="${cart.pago === 'qr' ? 'on' : ''}">QR</button></div>`;
+    if (cart.pago === 'efectivo') {
+      pay += `<div class="paybtns">
+        <button type="button" data-act="recibido" data-v="exacto" class="${cart.recibido === 'exacto' ? 'on' : ''}">Exacto</button>
+        ${BILLS.map(x => `<button type="button" data-act="recibido" data-v="${x}" class="${cart.recibido === x ? 'on' : ''}" ${x < t.total ? 'disabled' : ''}>Bs ${x}</button>`).join('')}</div>`;
+      const rec = cart.recibido === 'exacto' ? t.total : cart.recibido;
+      if (rec != null && rec >= t.total) pay += `<div class="change"><span>Cambio</span><span class="num">${money(rec - t.total)}</span></div>`;
+    }
+    if (cart.pago === 'qr') pay += `<div class="change"><span>Pago por QR</span><span class="num">${money(t.total)}</span></div>`;
+  }
+  return `<div class="ticket" id="ticket">
+    <h2>Pedido nuevo</h2>
+    <div class="sub">${CANALES[cart.canal]} · ${ENTREGAS[cart.entrega]}${b ? ' · ' + esc(b.name) : ''}${cart.lluvia && b ? ' · lluvia' : ''}</div>
+    <hr>
+    ${empty ? '<div class="empty">Toca un plato para empezar el pedido.</div>' : lines + extras}
+    ${!empty ? `<hr>
+      <div class="row"><span>Subtotal</span><span class="num">${money(t.sub)}</span></div>
+      ${b ? `<div class="row"><span>Delivery ${esc(b.name)}</span><span class="num">${money(t.fee)}</span></div>` : ''}
+      ${t.rain ? `<div class="row"><span>Recargo por lluvia</span><span class="num">${money(t.rain)}</span></div>` : ''}
+      <hr><div class="tot"><span>Total</span><span class="num">${money(t.total)}</span></div>${pay}
+      <p class="why" id="why">${why ? esc(why) : ''}</p>
+      <button class="btn primary block" type="button" data-act="confirm" ${why ? 'disabled' : ''}>Enviar a cocina y cobrar</button>
+      <button class="btn ghost block sm" type="button" data-act="clearCart" style="margin-top:8px;color:#241b14;border-color:#d5ccb8">Vaciar pedido</button>` : ''}
+  </div>`;
+}
+views.pedido = () => {
+  const m = S.menu;
+  return `<h1 class="view-title">Tomar pedido</h1>
+  ${S.arrozAgotado ? '<div class="banner">Arroz agotado: los pedidos nuevos salen con 30 minutos de espera.</div>' : ''}
+  <div class="pedido">
+   <div>
+    <div class="block"><h2>¿Por dónde llegó?</h2>
+      <div class="seg">${Object.entries(CANALES).map(([k, v]) => `<button type="button" data-act="canal" data-v="${k}" class="${cart.canal === k ? 'on' : ''}">${v}</button>`).join('')}</div></div>
+    <div class="block"><h2>Entrega</h2>
+      <div class="seg">${Object.entries(ENTREGAS).map(([k, v]) => `<button type="button" data-act="entrega" data-v="${k}" class="${cart.entrega === k ? 'on' : ''}">${v}</button>`).join('')}</div>
+      ${cart.entrega === 'delivery' ? `<div class="seg" style="margin-top:10px">${m.delivery.map(b => `<button type="button" data-act="barrio" data-v="${b.id}" class="${cart.barrio === b.id ? 'on' : ''}">${esc(b.name)}<small>${money(b.fee)}</small></button>`).join('')}</div>
+        <button type="button" class="toggle ${cart.lluvia ? 'on' : ''}" data-act="lluvia" style="margin:10px 0 0" aria-pressed="${cart.lluvia}"><span class="sw"></span>Lluvia<span class="r">+ ${money(m.lluvia)} a la moto</span></button>` : ''}
+    </div>
+    <div class="block"><h2>Pollo a la broaster</h2>
+      <button type="button" class="toggle ${cart.pp ? 'on' : ''}" data-act="pp" aria-pressed="${cart.pp}"><span class="sw"></span>Pura papa<span class="r">+ ${money(m.puraPapa)} por plato</span></button>
+      <div class="tiles">${m.items.filter(p => p.cat === 'pollo').map(tile).join('')}</div></div>
+    <div class="block"><h2>Otros platos</h2>
+      <div class="tiles two">${m.items.filter(p => p.cat !== 'pollo').map(tile).join('')}</div></div>
+    <div class="block"><h2>Porciones extra</h2>
+      <div class="tiles three">${m.extras.map(extraTile).join('')}</div></div>
+   </div>
+   <aside class="ticket-wrap" aria-label="Ticket del pedido">${ticketHTML()}</aside>
+  </div>`;
+};
+
+/* =====================================================================
+   COCINA (RF-03, RF-02.5)
+   ===================================================================== */
+function kitchenTicket(o) {
+  const canCancel = o.estado === 'pendiente';
+  const next = { pendiente: ['Empezar a preparar', 'start'], preparando: ['Marcar listo', 'ready'], listo: ['Marcar entregado', 'deliver'] }[o.estado];
+  const b = S.menu.delivery.find(x => x.id === o.barrio);
+  return `<article class="kt ${o.estado}">
+    <div class="hd"><span class="no">#${o.id}</span><span class="el" data-ts="${o.ts}" data-eta="${o.eta}" data-live="${o.estado !== 'listo' ? 1 : 0}">00:00</span></div>
+    <div class="tags"><span class="tag">${CANALES[o.canal]}</span><span class="tag y">${ENTREGAS[o.entrega]}</span>${b ? `<span class="tag">${esc(b.name)}</span>` : ''}${o.lluvia ? '<span class="tag r">Lluvia</span>' : ''}<span class="tag">${ESTADOS[o.estado]}</span></div>
+    <ul>${o.lines.map(l => `<li><b>${l.qty}×</b><span>${esc(l.name)}${l.pp ? ' <strong>(pura papa)</strong>' : ''}</span></li>`).join('')}${o.extras.map(e => `<li><b>${e.qty}×</b><span>${esc(e.name)}</span></li>`).join('')}</ul>
+    <div class="row" style="flex-wrap:wrap;gap:2px 10px"><span>Llegó ${timeStr(o.ts)} · espera ${o.eta} min</span><span class="num">${money(o.total)} · ${o.pago === 'qr' ? 'QR' : 'Efectivo'}</span></div>
+    <div class="acts">
+      <button class="btn primary" type="button" data-act="advance" data-id="${o.id}">${next[0]}</button>
+      ${canCancel ? `<button class="btn ghost" type="button" data-act="cancel" data-id="${o.id}" style="color:#241b14;border-color:#d5ccb8">Anular</button>` : ''}
+    </div>
+    ${canCancel ? '' : '<p class="note">Este pedido ya no se puede anular porque la preparación inició.</p>'}
+  </article>`;
+}
+views.cocina = () => {
+  const act = S.orders.filter(o => ACTIVE.includes(o.estado)).sort((a, b) => a.ts - b.ts);
+  const done = S.orders.filter(o => isToday(o.ts) && (o.estado === 'entregado' || o.estado === 'anulado')).sort((a, b) => b.ts - a.ts).slice(0, 8);
+  return `<h1 class="view-title">Cocina<small>en orden de llegada</small></h1>
+  <div class="block"><button type="button" class="toggle ${S.arrozAgotado ? 'on' : ''}" data-act="arroz" aria-pressed="${S.arrozAgotado}" style="margin:0"><span class="sw"></span>Arroz agotado<span class="r">${S.arrozAgotado ? 'Pedidos nuevos: 30 min' : 'Espera normal: ' + ETA_BASE + ' min'}</span></button></div>
+  ${act.length ? `<div class="kgrid">${act.map(kitchenTicket).join('')}</div>` : '<div class="block empty-state">No hay pedidos en curso. Los nuevos aparecen aquí apenas se cobran.</div>'}
+  ${done.length ? `<div class="block"><h2>Últimos de hoy</h2><div class="donelist">${done.map(o => `<div><span>#${o.id} · ${esc(orderSummary(o))}</span><span class="st ${o.estado}">${ESTADOS[o.estado]}</span></div>`).join('')}</div></div>` : ''}`;
+};
+
+function tick() {
+  const now = Date.now();
+  document.querySelectorAll('.el').forEach(el => {
+    const ms = Math.max(0, now - Number(el.dataset.ts));
+    const s = Math.floor(ms / 1000);
+    el.textContent = pad(Math.floor(s / 60)) + ':' + pad(s % 60);
+    el.classList.toggle('late', el.dataset.live === '1' && ms > Number(el.dataset.eta) * 60000);
+  });
+  const c = $('#clock'); if (c) c.textContent = timeStr(now);
+}
+
+/* =====================================================================
+   CAJA (RF-05)
+   ===================================================================== */
+function ensureCaja() {
+  if (!S.caja || S.caja.day !== todayKey()) { S.caja = { day: todayKey(), inicial: 0, den: {} }; save(); }
+}
+const round2 = n => Math.round(n * 100) / 100;
+function cajaCalc() {
+  ensureCaja();
+  const st = dayStats(todayKey()), c = S.caja;
+  const counted = round2(DENOMS.reduce((a, d) => a + d * (c.den[d] || 0), 0));
+  const expected = round2((Number(c.inicial) || 0) + st.cash);
+  const diff = round2(counted - expected);
+  let res;
+  if (counted === 0) res = '<div class="result wait">Cuenta los billetes y monedas de la caja para ver si cuadra.</div>';
+  else if (diff === 0) res = '<div class="result ok"><div class="big">La caja cuadra</div>El efectivo contado coincide con lo esperado.</div>';
+  else if (diff > 0) res = `<div class="result bad"><div class="big">Sobran ${money(diff)}</div>Hay más efectivo del que indican las ventas.</div>`;
+  else res = `<div class="result bad"><div class="big">Faltan ${money(-diff)}</div>Hay menos efectivo del que indican las ventas.</div>`;
+  return { st, counted, expected, diff, html: `
+    <div class="kv"><span>Caja inicial</span><span>${money(Number(c.inicial) || 0)}</span></div>
+    <div class="kv"><span>+ Ventas en efectivo</span><span>${money(st.cash)}</span></div>
+    <div class="kv"><span>Efectivo esperado</span><span>${money(expected)}</span></div>
+    <div class="kv"><span>Efectivo contado</span><span>${money(counted)}</span></div>${res}` };
+}
+views.caja = () => {
+  ensureCaja();
+  const k = todayKey(), cl = S.arqueos[k], calc = cajaCalc(), st = calc.st;
+  const past = Object.entries(S.arqueos).filter(([d]) => d !== k).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 7);
+  const head = `<h1 class="view-title">Caja<small>hoy ${dateStr(Date.now())}</small></h1>
+   <div class="block"><h2>Cobros de hoy</h2><div class="stats">
+     <div class="stat"><div class="v">${money(st.cash)}</div><div class="l">En efectivo</div></div>
+     <div class="stat"><div class="v">${money(st.qr)}</div><div class="l">Por QR</div></div>
+     <div class="stat"><div class="v">${money(st.total)}</div><div class="l">${st.n} pedidos cobrados</div></div></div></div>`;
+  let arq;
+  if (cl) {
+    arq = `<div class="block"><h2>Caja cerrada a las ${timeStr(cl.ts)}</h2>
+      <div class="kv"><span>Efectivo esperado</span><span>${money(cl.esperado)}</span></div>
+      <div class="kv"><span>Efectivo contado</span><span>${money(cl.contado)}</span></div>
+      <div class="kv"><span>Cobrado por QR</span><span>${money(cl.qr)}</span></div>
+      <div class="result ${cl.diff === 0 ? 'ok' : 'bad'}"><div class="big">${cl.diff === 0 ? 'La caja cuadró' : cl.diff > 0 ? 'Sobraron ' + money(cl.diff) : 'Faltaron ' + money(-cl.diff)}</div></div>
+      <button class="btn ghost block" type="button" data-act="reopenCaja" style="margin-top:12px">Reabrir caja</button></div>`;
+  } else {
+    arq = `<div class="block"><h2>Arqueo de caja</h2>
+      <label class="field" style="max-width:260px"><span>Caja inicial (Bs)</span><input class="num-in" type="number" inputmode="decimal" min="0" step="0.5" value="${esc(S.caja.inicial)}" data-in="inicial"></label>
+      <h3 style="margin:8px 0">Conteo final</h3>
+      <div class="den">${DENOMS.map(d => `<div class="d"><b>${d >= 10 ? 'Bs ' + d : d >= 1 ? 'Bs ' + d : '50 ctvs'}</b>
+        <span class="step"><button type="button" data-act="denDec" data-d="${d}" aria-label="Quitar uno de ${d}">−</button><b>${S.caja.den[d] || 0}</b><button type="button" data-act="denInc" data-d="${d}" aria-label="Agregar uno de ${d}">+</button></span></div>`).join('')}</div>
+      <div id="cajaCalc" style="margin-top:12px">${calc.html}</div>
+      <button class="btn primary block" type="button" data-act="closeCaja" style="margin-top:12px" ${calc.counted === 0 ? 'disabled' : ''}>Cerrar caja</button></div>`;
+  }
+  const hist = past.length ? `<div class="block"><h2>Cierres anteriores</h2><table><thead><tr><th>Día</th><th class="r">Efectivo</th><th class="r">QR</th><th class="r">Resultado</th></tr></thead><tbody>
+     ${past.map(([d, a]) => `<tr><td>${d.slice(8)}/${d.slice(5, 7)}</td><td class="r">${money(a.cash)}</td><td class="r">${money(a.qr)}</td><td class="r">${a.diff === 0 ? 'Cuadró' : (a.diff > 0 ? 'Sobró ' : 'Faltó ') + money(Math.abs(a.diff))}</td></tr>`).join('')}</tbody></table></div>` : '';
+  return head + arq + hist;
+};
+
+/* =====================================================================
+   COMPRAS (RF-06)
+   ===================================================================== */
+let buy = { producto: '', cant: '', monto: '', fecha: todayKey() };
+views.compras = () => {
+  const list = [...S.purchases].sort((a, b) => b.ts - a.ts).slice(0, 30);
+  const tot = sumBy(list, p => p.monto);
+  return `<h1 class="view-title">Compras de bebidas</h1>
+  <div class="block"><h2>Registrar compra</h2>
+    <div class="inline">
+      <label class="field"><span>Producto</span><input data-buy="producto" list="bebidas" value="${esc(buy.producto)}" placeholder="Gaseosa 2 L"></label>
+      <label class="field"><span>Cantidad</span><input data-buy="cant" type="number" inputmode="numeric" min="1" step="1" value="${esc(buy.cant)}"></label>
+      <label class="field"><span>Monto (Bs)</span><input data-buy="monto" type="number" inputmode="decimal" min="0" step="0.5" value="${esc(buy.monto)}"></label>
+      <label class="field"><span>Fecha</span><input data-buy="fecha" type="date" value="${esc(buy.fecha)}"></label>
+    </div>
+    <datalist id="bebidas"><option value="Gaseosa 2 L"><option value="Gaseosa 1 L"><option value="Gaseosa personal"><option value="Agua"></datalist>
+    <button class="btn primary" type="button" data-act="addBuy" style="margin-top:12px">Registrar compra</button>
+  </div>
+  <div class="block"><h2>Últimas compras</h2>
+    ${list.length ? `<table><thead><tr><th>Fecha</th><th>Producto</th><th class="r">Cant.</th><th class="r">Monto</th></tr></thead><tbody>
+      ${list.map(p => `<tr><td>${dateStr(p.ts)}</td><td>${esc(p.producto)}</td><td class="r">${p.cant}</td><td class="r">${money(p.monto)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="3"><b>Total de estas compras</b></td><td class="r"><b>${money(tot)}</b></td></tr></tfoot></table>`
+      : '<div class="empty-state">Aún no hay compras. Registra la primera arriba.</div>'}
+  </div>`;
+};
+
+/* =====================================================================
+   REPORTES (RF-07.2 a RF-07.5)
+   ===================================================================== */
+const rangeDays = n => ({ from: dayKey(startOfDay(Date.now()) - (n - 1) * 86400000), to: todayKey() });
+let rep = { ...rangeDays(7), canal: 'todos', pago: 'todos' };
+const bars = (rows, max, peakIdx = -1) => rows.map((r, i) => `<div class="bar"><span>${esc(r[0])}</span><div class="tr"><div class="fl ${i === peakIdx ? 'peak' : ''}" style="width:${max ? Math.max(2, r[1] / max * 100) : 0}%"></div></div><span>${r[1]}</span></div>`).join('');
+views.reportes = () => {
+  const k = todayKey(), d = dayStats(k);
+  const inRange = S.orders.filter(o => { const dk = dayKey(o.ts); return dk >= rep.from && dk <= rep.to; });
+  const ok = validOrders(inRange);
+  const units = {}; S.menu.items.forEach(i => units[i.id] = 0);
+  ok.forEach(o => o.lines.forEach(l => { units[l.pid] = (units[l.pid] || 0) + l.qty; }));
+  const prodRows = Object.entries(units).map(([id, n]) => [(itemOf(id) || { short: id }).short, n]).sort((a, b) => b[1] - a[1]);
+  const cat = { Pollo: 0, Hamburguesa: 0, Salchipapa: 0 };
+  ok.forEach(o => o.lines.forEach(l => { const p = itemOf(l.pid); if (!p) return; cat[p.cat === 'pollo' ? 'Pollo' : p.cat === 'hamburguesa' ? 'Hamburguesa' : 'Salchipapa'] += l.qty; }));
+  const hrs = {}; ok.forEach(o => { const h = new Date(o.ts).getHours(); hrs[h] = (hrs[h] || 0) + 1; });
+  const hKeys = Object.keys(hrs).map(Number);
+  let hourRows = [], peak = -1, hmax = 0;
+  if (hKeys.length) {
+    for (let h = Math.min(...hKeys); h <= Math.max(...hKeys); h++) hourRows.push([pad(h) + ':00', hrs[h] || 0]);
+    hmax = Math.max(...hourRows.map(r => r[1])); peak = hourRows.findIndex(r => r[1] === hmax);
+  }
+  const hist = inRange.filter(o => (rep.canal === 'todos' || o.canal === rep.canal) && (rep.pago === 'todos' || o.pago === rep.pago)).sort((a, b) => b.ts - a.ts);
+  const isPreset = n => { const r = rangeDays(n); return rep.from === r.from && rep.to === r.to; };
+  return `<h1 class="view-title">Reportes</h1>
+  <div class="block"><h2>Resumen de hoy</h2><div class="stats five">
+    <div class="stat"><div class="v">${money(d.total)}</div><div class="l">Ventas (${d.n} pedidos)</div></div>
+    <div class="stat"><div class="v">${money(d.cash)}</div><div class="l">Efectivo</div></div>
+    <div class="stat"><div class="v">${money(d.qr)}</div><div class="l">QR</div></div>
+    <div class="stat"><div class="v">${money(d.fees)}</div><div class="l">Delivery</div></div>
+    <div class="stat"><div class="v">${money(d.buys)}</div><div class="l">Compras de bebidas</div></div></div></div>
+  <div class="block"><h2>Período</h2>
+    <div class="pills"><button type="button" data-act="preset" data-n="1" class="${isPreset(1) ? 'on' : ''}">Hoy</button><button type="button" data-act="preset" data-n="7" class="${isPreset(7) ? 'on' : ''}">7 días</button><button type="button" data-act="preset" data-n="30" class="${isPreset(30) ? 'on' : ''}">30 días</button></div>
+    <div class="inline"><label class="field"><span>Desde</span><input type="date" data-rep="from" value="${rep.from}"></label><label class="field"><span>Hasta</span><input type="date" data-rep="to" value="${rep.to}"></label></div></div>
+  <div class="cols two">
+    <div class="block"><h2>Platos más vendidos</h2>
+      ${ok.length ? `<div class="bars">${bars(prodRows, prodRows[0][1])}</div>
+      <p class="muted" style="margin:12px 0 0">Pollo ${cat.Pollo} · Salchipapa ${cat.Salchipapa} · Hamburguesa ${cat.Hamburguesa}</p>` : '<div class="empty-state">No hay ventas en este período.</div>'}</div>
+    <div class="block"><h2>Horas de mayor demanda</h2>
+      ${hourRows.length ? `<div class="bars">${bars(hourRows, hmax, peak)}</div><p class="muted" style="margin:12px 0 0">La hora más fuerte es ${hourRows[peak][0]} con ${hmax} pedidos.</p>` : '<div class="empty-state">No hay pedidos en este período.</div>'}</div>
+  </div>
+  <div class="block"><h2>Historial de pedidos</h2>
+    <div class="inline" style="margin-bottom:8px">
+      <label class="field"><span>Canal</span><select data-rep="canal"><option value="todos">Todos</option>${Object.entries(CANALES).map(([v, l]) => `<option value="${v}" ${rep.canal === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="field"><span>Método de pago</span><select data-rep="pago"><option value="todos">Todos</option><option value="efectivo" ${rep.pago === 'efectivo' ? 'selected' : ''}>Efectivo</option><option value="qr" ${rep.pago === 'qr' ? 'selected' : ''}>QR</option></select></label></div>
+    ${hist.length ? hist.slice(0, 30).map(o => `<details class="h"><summary><b>#${o.id}</b><span>${dateStr(o.ts)} ${timeStr(o.ts)} · ${CANALES[o.canal]}<br><span class="muted">${esc(entregaLabel(o))}</span></span><span class="num"><b>${money(o.total)}</b> <span class="st ${o.estado}">${ESTADOS[o.estado]}</span></span></summary>
+      <div class="dt">${esc(orderSummary(o))}<br>Subtotal ${money(o.sub)}${o.fee ? ' · Delivery ' + money(o.fee) : ''}${o.rain ? ' · Lluvia ' + money(o.rain) : ''} · Pago ${o.pago === 'qr' ? 'por QR' : 'en efectivo' + (o.cambio ? ' (cambio ' + money(o.cambio) + ')' : '')}</div></details>`).join('')
+      + (hist.length > 30 ? `<p class="muted">Mostrando los 30 más recientes de ${hist.length}.</p>` : '')
+      : '<div class="empty-state">Ningún pedido coincide con estos filtros.</div>'}
+  </div>`;
+};
+
+/* =====================================================================
+   MENÚ Y TARIFAS (RF-07.1)
+   ===================================================================== */
+const mrow = (label, path, val) => `<div class="menu-row"><span>${esc(label)}</span><input class="num-in" type="number" inputmode="decimal" min="0" step="0.5" value="${val}" data-menu="${path}" aria-label="${esc(label)} en bolivianos"></div>`;
+views.menu = () => {
+  const m = S.menu;
+  return `<h1 class="view-title">Menú y tarifas<small>los cambios valen para pedidos nuevos</small></h1>
+  <div class="cols two">
+   <div class="block"><h2>Platos</h2>${m.items.map((p, i) => mrow(p.name, `items.${i}.price`, p.price)).join('')}
+     ${mrow('Recargo pura papa', 'puraPapa', m.puraPapa)}</div>
+   <div class="block"><h2>Porciones extra</h2>${m.extras.map((p, i) => mrow(p.name, `extras.${i}.price`, p.price)).join('')}</div>
+   <div class="block"><h2>Tarifas de delivery</h2>${m.delivery.map((b, i) => mrow(b.name, `delivery.${i}.fee`, b.fee)).join('')}
+     <h3 style="margin:14px 0 8px">Recargo por lluvia</h3>
+     <div class="seg"><button type="button" data-act="lluviaAmt" data-v="1" class="${m.lluvia === 1 ? 'on' : ''}">Bs 1</button><button type="button" data-act="lluviaAmt" data-v="2" class="${m.lluvia === 2 ? 'on' : ''}">Bs 2</button></div></div>
+   <div class="block"><h2>Precios iniciales</h2><p class="muted" style="margin-top:0">Vuelve a los precios y tarifas del documento de requerimientos.</p>
+     <button class="btn ghost" type="button" data-act="resetMenu">Restaurar precios iniciales</button></div>
+  </div>`;
+};
+
+/* =====================================================================
+   ACERCA DEL MVP (plantilla del docente)
+   ===================================================================== */
+let resetArmed = false;
+function openAbout() {
+  $('#aboutBody').innerHTML = `<h2>Sistema RR&amp;J · MVP</h2>
+   <p class="muted" style="margin:4px 0 0">Pollos RR&amp;J · Ing. de Software I · Carvajal y Hidalgo</p>
+   <h3>Idea</h3><p style="margin:0">Una sola herramienta para que Roxana tome pedidos, los envíe a cocina, calcule el delivery y cierre la caja sin papel ni cálculos a mano.</p>
+   <h3>Problema que resuelve</h3><p style="margin:0">Hoy los pedidos se anotan en papel o de memoria, el delivery se calcula a mano y el arqueo de caja no permite rastrear diferencias de dinero.</p>
+   <h3>Qué hace este MVP</h3><ul>
+     <li>Acceso con usuario y contraseña; la propietaria tiene los tres roles.</li>
+     <li>Pedidos por presencial, teléfono o WhatsApp con extras y pura papa.</li>
+     <li>Delivery por barrio y recargo por lluvia.</li>
+     <li>Cola de cocina con tiempos, estados y aviso de arroz agotado.</li>
+     <li>Cobro en efectivo (con cambio) o QR, y arqueo de caja.</li>
+     <li>Compras de bebidas, precios editables y reportes.</li></ul>
+   <h3>Qué no hace todavía</h3><ul>
+     <li>No usa base de datos ni servidor: guarda en este navegador.</li>
+     <li>Sin usuarios adicionales (cajera, cocina), chatbot de WhatsApp ni enlace LAN.</li>
+     <li>Sin inventario de insumos, fiado, pagos en línea ni más de un local.</li></ul>
+   <h3>Datos de demostración</h3><p style="margin:0">Las ventas, compras y cierres de los últimos días son datos de ejemplo. Para probar en dos pestañas (caja y cocina), abre este archivo dos veces en el mismo navegador.</p>
+   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+     <button class="btn ${resetArmed ? 'danger' : 'ghost'}" type="button" data-act="resetAll">${resetArmed ? 'Confirmar: borrar y reiniciar' : 'Reiniciar datos de demostración'}</button>
+     <button class="btn primary" type="button" data-act="closeAbout">Cerrar</button></div>`;
+  const dlg = $('#about'); if (!dlg.open) dlg.showModal();
+}
+
+/* =====================================================================
+   ACCIONES
+   ===================================================================== */
+function fixPay() {
+  const t = calcOrder(cart, S.menu);
+  if (cart.pago === 'efectivo' && typeof cart.recibido === 'number' && cart.recibido < t.total) cart.recibido = null;
+}
+const acts = {
+  nav(d) { view = d.v; render(); window.scrollTo(0, 0); },
+  about() { resetArmed = false; openAbout(); },
+  closeAbout() { $('#about').close(); },
+  logout() { try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { } showLogin(); },
+  /* pedido */
+  canal(d) { cart.canal = d.v; render(); },
+  entrega(d) { cart.entrega = d.v; if (d.v !== 'delivery') { cart.barrio = null; cart.lluvia = false; } fixPay(); render(); },
+  barrio(d) { cart.barrio = d.v; fixPay(); render(); },
+  lluvia() { cart.lluvia = !cart.lluvia; fixPay(); render(); },
+  pp() { cart.pp = !cart.pp; render(); },
+  add(d) {
+    const p = itemOf(d.id), pp = p.cat === 'pollo' && cart.pp;
+    const l = cart.lines.find(x => x.pid === p.id && x.pp === pp);
+    if (l) l.qty++; else cart.lines.push({ pid: p.id, pp, qty: 1 });
+    fixPay(); render();
+  },
+  addExtra(d) { const e = cart.extras.find(x => x.id === d.id); if (e) e.qty++; else cart.extras.push({ id: d.id, qty: 1 }); fixPay(); render(); },
+  lineInc(d) { cart.lines[+d.i].qty++; fixPay(); render(); },
+  lineDec(d) { const l = cart.lines[+d.i]; if (--l.qty <= 0) cart.lines.splice(+d.i, 1); fixPay(); render(); },
+  exInc(d) { cart.extras[+d.i].qty++; fixPay(); render(); },
+  exDec(d) { const l = cart.extras[+d.i]; if (--l.qty <= 0) cart.extras.splice(+d.i, 1); fixPay(); render(); },
+  pago(d) { cart.pago = d.v; if (d.v === 'qr') cart.recibido = null; render(); },
+  recibido(d) { cart.recibido = d.v === 'exacto' ? 'exacto' : Number(d.v); render(); },
+  clearCart() { cart = newCart(); render(); },
+  goTicket() { const t = $('#ticket'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+  confirm() {
+    const why = validateCart(); if (why) { toast(why); return; }
+    const t = calcOrder(cart, S.menu), efect = cart.pago === 'efectivo';
+    const recibido = efect ? (cart.recibido === 'exacto' ? t.total : cart.recibido) : t.total;
+    const o = {
+      id: S.nextId++, ts: Date.now(), canal: cart.canal, entrega: cart.entrega, barrio: cart.entrega === 'delivery' ? cart.barrio : null,
+      lluvia: cart.entrega === 'delivery' && cart.lluvia,
+      lines: cart.lines.map(l => { const p = itemOf(l.pid); return { pid: l.pid, name: p.name, pp: l.pp, qty: l.qty, unit: p.price }; }),
+      extras: cart.extras.map(e => { const p = S.menu.extras.find(x => x.id === e.id); return { id: e.id, name: p.name, qty: e.qty, unit: p.price }; }),
+      sub: t.sub, fee: t.fee, rain: t.rain, total: t.total, pago: cart.pago, recibido, cambio: efect ? recibido - t.total : 0,
+      estado: 'pendiente', eta: S.arrozAgotado ? ETA_ARROZ : ETA_BASE
+    };
+    S.orders.push(o); save(); cart = newCart();
+    toast(`Pedido #${o.id} enviado a cocina · ${money(o.total)}`); render();
+  },
+  /* cocina */
+  arroz() { S.arrozAgotado = !S.arrozAgotado; save(); toast(S.arrozAgotado ? 'Arroz agotado: espera de 30 min en pedidos nuevos' : 'Arroz disponible de nuevo'); render(); },
+  advance(d) {
+    const o = S.orders.find(x => x.id === +d.id); if (!o) return;
+    if (o.estado === 'pendiente') { o.estado = 'preparando'; o.startedAt = Date.now(); }
+    else if (o.estado === 'preparando') o.estado = 'listo';
+    else if (o.estado === 'listo') o.estado = 'entregado';
+    save(); render();
+  },
+  cancel(d) {
+    const o = S.orders.find(x => x.id === +d.id); if (!o) return;
+    if (o.estado !== 'pendiente') { toast('No se puede anular: la preparación ya inició.'); return; }
+    o.estado = 'anulado'; save(); toast(`Pedido #${o.id} anulado`); render();
+  },
+  /* caja */
+  denInc(d) { ensureCaja(); S.caja.den[d.d] = (S.caja.den[d.d] || 0) + 1; save(); render(); },
+  denDec(d) { ensureCaja(); S.caja.den[d.d] = Math.max(0, (S.caja.den[d.d] || 0) - 1); save(); render(); },
+  closeCaja() {
+    const c = cajaCalc(); if (c.counted === 0) return;
+    S.arqueos[todayKey()] = { inicial: Number(S.caja.inicial) || 0, esperado: c.expected, contado: c.counted, diff: c.diff, cash: c.st.cash, qr: c.st.qr, ts: Date.now() };
+    save(); toast('Caja cerrada'); render();
+  },
+  reopenCaja() { delete S.arqueos[todayKey()]; save(); render(); },
+  /* compras */
+  addBuy() {
+    const cant = parseInt(buy.cant, 10), monto = parseFloat(buy.monto), prod = buy.producto.trim();
+    if (!prod) { toast('Escribe qué bebida compraste.'); return; }
+    if (!(cant > 0)) { toast('La cantidad debe ser mayor a 0.'); return; }
+    if (!(monto >= 0) || buy.monto === '') { toast('Indica el monto en bolivianos.'); return; }
+    const [y, m, d] = (buy.fecha || todayKey()).split('-').map(Number);
+    const ts = buy.fecha === todayKey() ? Date.now() : new Date(y, m - 1, d, 12).getTime();
+    S.purchases.push({ id: S.nextPurchase++, ts, producto: prod, cant, monto });
+    save(); buy = { producto: '', cant: '', monto: '', fecha: todayKey() }; toast('Compra registrada'); render();
+  },
+  /* reportes */
+  preset(d) { rep = { ...rep, ...rangeDays(+d.n) }; render(); },
+  /* menú */
+  lluviaAmt(d) { S.menu.lluvia = +d.v; save(); toast('Recargo por lluvia: Bs ' + d.v); render(); },
+  resetMenu() { const keep = defaultMenu(); S.menu = keep; save(); toast('Precios iniciales restaurados'); render(); },
+  resetAll() {
+    if (!resetArmed) { resetArmed = true; openAbout(); return; }
+    resetArmed = false; try { localStorage.removeItem(KEY); } catch (e) { }
+    S = seedState(); save(); cart = newCart(); buy = { producto: '', cant: '', monto: '', fecha: todayKey() };
+    $('#about').close(); toast('Datos de demostración reiniciados'); render();
+  }
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const fn = acts[el.dataset.act]; if (fn) fn(el.dataset, el);
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.in === 'inicial') {
+    ensureCaja(); S.caja.inicial = t.value === '' ? 0 : Math.max(0, parseFloat(t.value) || 0); save();
+    const c = cajaCalc(); $('#cajaCalc').innerHTML = c.html;
+  } else if (t.dataset.buy) { buy[t.dataset.buy] = t.value; }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.rep) {
+    rep[t.dataset.rep] = t.value;
+    if (rep.from > rep.to) { const x = rep.from; rep.from = rep.to; rep.to = x; }
+    render();
+  } else if (t.dataset.menu) {
+    const v = parseFloat(t.value);
+    if (!(v >= 0)) { toast('Ingresa un precio válido.'); render(); return; }
+    const path = t.dataset.menu.split('.');
+    let o = S.menu; for (let i = 0; i < path.length - 1; i++) o = o[path[i]];
+    o[path[path.length - 1]] = v; save(); toast('Precio guardado');
+  }
+});
+
+/* =====================================================================
+   ACCESO (RF-01) E INICIO
+   ===================================================================== */
+function showApp() { $('#login').hidden = true; $('#app').hidden = false; render(); }
+function showLogin() { $('#app').hidden = true; $('#login').hidden = false; $('#lgPass').value = ''; $('#lgErr').textContent = ''; cart = newCart(); $('#cartbar').hidden = true; }
+$('#loginForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const u = $('#lgUser').value.trim().toLowerCase(), p = $('#lgPass').value;
+  if (u === USER.user && p === USER.pass) { try { sessionStorage.setItem(SESSION_KEY, '1'); } catch (x) { } showApp(); }
+  else { $('#lgErr').textContent = 'Usuario o contraseña incorrectos.'; $('#lgPass').value = ''; $('#lgPass').focus(); }
+});
+window.addEventListener('storage', ev => { if (ev.key === KEY && !$('#app').hidden) { load(); render(); } });
+setInterval(tick, 1000);
+
+load();
+let logged = false; try { logged = sessionStorage.getItem(SESSION_KEY) === '1'; } catch (e) { }
+if (logged) showApp();
+</script>
+</body>
+</html>
